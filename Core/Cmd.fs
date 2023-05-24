@@ -124,7 +124,7 @@ module Cmd =
                     pending <- pending - 1
 
                     if pending = 0 then
-                        tcs.TrySetResult msgs |> ignore)
+                        tcs.TrySetResult (msgs |> List.rev) |> ignore)
 
             subCmd dispatch
 

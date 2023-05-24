@@ -1,8 +1,10 @@
 module Elmish.Test.Tests.Cmd
 
 open System
+open System.Collections.Generic
 open Elmish
 open Xunit
+open Swensen.Unquote
 open Elmish.Test.Core
 
 type Msg =
@@ -222,3 +224,24 @@ let ``Cmd.forall: can increase timeout`` () =
     
     // Cleanup
     Config.TimeoutLengthMilliseconds <- 3000
+    
+[<Fact>]
+let ``Cmd.captureMessages: captures sync messages`` () =
+    // Arrange
+    let messages =
+        [
+            Case1
+            Case2
+            Case3
+        ]
+        
+    let commands =
+        messages
+        |> List.map Cmd.ofMsg
+        |> Cmd.batch
+        
+    // Act
+    let results = commands |> Cmd.captureMessages
+    
+    // Assert
+    messages =! results

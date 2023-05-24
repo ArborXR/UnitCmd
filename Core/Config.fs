@@ -1,4 +1,4 @@
 ﻿namespace Elmish.Test.Core
 
 module Config =
-    let mutable TimeoutLength = 3000
+    let mutable TimeoutLengthMilliseconds = 3000

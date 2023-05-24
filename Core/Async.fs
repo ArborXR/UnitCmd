@@ -9,9 +9,9 @@ module private Async =
             return! computation
         }
 
-    let withTimeout (timeout: int) (computation: Async<'a>) =
+    let withTimeout (timeoutMilliseconds: int) (computation: Async<'a>) =
         async {
-            let! child = Async.StartChild(computation, timeout)
+            let! child = Async.StartChild(computation, timeoutMilliseconds)
             return! child
         }
 

@@ -5,44 +5,23 @@ open System.Threading.Tasks
 
 module Cmd =
     /// <summary>
-    /// Executes the provided commands with a no-op dispatch function.
+    /// Invokes the provided commands with a no-op dispatch function.
     /// </summary>
     /// <param name="cmd">The command to execute.</param>
     /// <remarks>
-    /// The timeout length can be configured with Config.TimeoutLength.
+    /// Note that this function does not wait for the command to complete. 
     /// </remarks>
-    /// <exception cref="TimeoutException">
-    /// Thrown if the command does not complete within the specified time.
-    /// </exception>
     let execute (cmd: Cmd<'msg>) =
-        let tcs = TaskCompletionSource<unit>()
-        let mutable pending = cmd.Length
-        let syncRoot = obj ()
-
-        let exec subCmd =
-            let dispatch _ =
-                lock syncRoot (fun () ->
-                    pending <- pending - 1
-
-                    if pending = 0 then
-                        tcs.TrySetResult() |> ignore)
-
-            subCmd dispatch
-
-        async {
-            cmd |> List.iter exec
-            return! Async.AwaitTask tcs.Task
-        }
-        |> Async.withTimeout Config.TimeoutLength
-        |> Async.RunSynchronously
-
+        let dispatch: Dispatch<'msg> = fun _ -> ()
+        cmd |> List.iter (fun call -> call dispatch)
+    
     /// <summary>
     /// Tests whether any message dispatched by the command satisfies the given predicate.
     /// The predicate is applied to the messages dispatch by the command. If any application returns true the
     /// overall result is true and no further elements are tested. Otherwise, false is returned.
     /// </summary>
     /// <remarks>
-    /// The timeout length can be configured with Config.TimeoutLength.
+    /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
     /// </remarks>
     /// <param name="predicate">The function to test the dispatched messages.</param>
     /// <param name="cmd">The input Cmd.</param>
@@ -75,7 +54,7 @@ module Cmd =
             cmd |> List.iter exec
             return! Async.AwaitTask tcs.Task
         }
-        |> Async.withTimeout Config.TimeoutLength
+        |> Async.withTimeout Config.TimeoutLengthMilliseconds
         |> Async.RunSynchronously
 
     /// <summary>
@@ -87,7 +66,7 @@ module Cmd =
     /// <param name="cmd">The input Cmd.</param>
     /// <returns>True if every element satisfies the predicate. Otherwise false.</returns>
     /// <remarks>
-    /// The timeout length can be configured with Config.TimeoutLength.
+    /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
     /// </remarks>
     /// <exception cref="TimeoutException">
     /// Thrown if the command does not complete within the specified time.
@@ -118,7 +97,7 @@ module Cmd =
             cmd |> List.iter exec
             return! Async.AwaitTask tcs.Task
         }
-        |> Async.withTimeout Config.TimeoutLength
+        |> Async.withTimeout Config.TimeoutLengthMilliseconds
         |> Async.RunSynchronously
 
     /// <summary>
@@ -127,7 +106,7 @@ module Cmd =
     /// <param name="cmd">The command to execute.</param>
     /// <returns>A list of messages captured during the execution of the command.</returns>
     /// <remarks>
-    /// The timeout length can be configured with Config.TimeoutLength.
+    /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
     /// </remarks>
     /// <exception cref="TimeoutException">
     /// Thrown if the command does not complete within the specified time.
@@ -153,5 +132,5 @@ module Cmd =
             cmd |> List.iter exec
             return! Async.AwaitTask tcs.Task
         }
-        |> Async.withTimeout Config.TimeoutLength
+        |> Async.withTimeout Config.TimeoutLengthMilliseconds
         |> Async.RunSynchronously

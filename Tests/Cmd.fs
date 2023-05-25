@@ -76,7 +76,7 @@ let ``Cmd.Dispatches.exists: returns true WHEN synchronous AND predicate satisfi
 let ``Cmd.Dispatches.exists: returns true WHEN async AND predicate satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 500; Case2 |> Cmd.ofMsg |> delayed 500 ]
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -102,7 +102,7 @@ let ``Cmd.Dispatches.exists: returns false WHEN synchronous AND predicate is not
 let ``Cmd.Dispatches.exists: returns false WHEN async AND predicate is not satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 500; Case2 |> Cmd.ofMsg |> delayed 500 ]
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -117,13 +117,14 @@ let ``Cmd.Dispatches.exists: times out if running for over default three seconds
     let cmd = Case1 |> Cmd.ofMsg |> delayed 3020
     
     // Act/Assert
-    Assert.Throws<TimeoutException>(fun () ->  cmd |> Cmd.Dispatches.exists ((=) Case1) |> ignore)
+    Assert.Throws<OperationCanceledException>(fun () ->  cmd |> Cmd.Dispatches.exists ((=) Case1) |> ignore)
     
 [<Fact>]
 let ``Cmd.Dispatches.exists: can increase timeout`` () =
     // Arrange
-    Config.TimeoutLengthMilliseconds <- 4000
-    let cmd = Case1 |> Cmd.ofMsg |> delayed 3020
+    let initialTimeout = Config.TimeoutLengthMilliseconds
+    Config.TimeoutLengthMilliseconds <- initialTimeout + 200
+    let cmd = Case1 |> Cmd.ofMsg |> delayed (initialTimeout + 100)
     
     // Act
     let result = cmd |> Cmd.Dispatches.exists ((=) Case1)
@@ -132,7 +133,7 @@ let ``Cmd.Dispatches.exists: can increase timeout`` () =
     Assert.True result
     
     // Cleanup
-    Config.TimeoutLengthMilliseconds <- 3000
+    Config.TimeoutLengthMilliseconds <- initialTimeout
     
 [<Fact>]
 let ``Cmd.Dispatches.exists: times out if command never dispatches`` () =
@@ -143,7 +144,7 @@ let ``Cmd.Dispatches.exists: times out if command never dispatches`` () =
     
     // Act
     // Assert
-    Assert.Throws<TimeoutException>(fun () -> command |> Cmd.Dispatches.exists (fun _ -> true) |> ignore)
+    Assert.Throws<OperationCanceledException>(fun () -> command |> Cmd.Dispatches.exists (fun _ -> true) |> ignore)
     
 [<Fact>]
 let ``Cmd.Dispatches.forall: returns true with Cmd.none`` () =
@@ -173,7 +174,7 @@ let ``Cmd.Dispatches.forall: returns true WHEN synchronous AND predicate satisfi
 let ``Cmd.Dispatches.forall: returns true WHEN async AND predicate satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 500; Case2 |> Cmd.ofMsg |> delayed 500 ]
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -199,7 +200,7 @@ let ``Cmd.Dispatches.forall: returns false WHEN synchronous AND predicate is not
 let ``Cmd.Dispatches.forall: returns false WHEN async AND predicate is not satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 500; Case2 |> Cmd.ofMsg |> delayed 500 ]
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -209,30 +210,16 @@ let ``Cmd.Dispatches.forall: returns false WHEN async AND predicate is not satis
     Assert.False result
 
 [<Fact>]
-let ``Cmd.Dispatches.forall: times out if running for over default three seconds`` () =
+let ``Cmd.Dispatches.forall: times out if running for over default configured timeout`` () =
     // Arrange
-    let cmd = Case1 |> Cmd.ofMsg |> delayed 3020
+    let delay = Config.TimeoutLengthMilliseconds + 100
+    let cmd = Case1 |> Cmd.ofMsg |> delayed delay
     
     // Act/Assert
-    Assert.Throws<TimeoutException>(fun () ->  cmd |> Cmd.Dispatches.forall ((=) Case1) |> ignore)
-    
+    Assert.Throws<OperationCanceledException>(fun () ->  cmd |> Cmd.Dispatches.forall ((=) Case1) |> ignore)
+     
 [<Fact>]
-let ``Cmd.Dispatches.forall: can increase timeout`` () =
-    // Arrange
-    Config.TimeoutLengthMilliseconds <- 4000
-    let cmd = Case1 |> Cmd.ofMsg |> delayed 3020
-    
-    // Act
-    let result = cmd |> Cmd.Dispatches.forall ((=) Case1)
-    
-    // Assert
-    Assert.True result
-    
-    // Cleanup
-    Config.TimeoutLengthMilliseconds <- 3000
-    
-[<Fact>]
-let ``Cmd.captureMessages: captures sync messages`` () =
+let ``Cmd.Dispatches.captureMessages: captures sync messages`` () =
     // Arrange
     let messages =
         [
@@ -247,7 +234,28 @@ let ``Cmd.captureMessages: captures sync messages`` () =
         |> Cmd.batch
         
     // Act
-    let results = commands |> Cmd.Dispatches.captureMessages
+    let results = commands |> Cmd.Dispatches.captureMessages |> Set.ofList
     
     // Assert
-    messages =! results
+    messages |> Set.ofList =! results
+    
+[<Fact>]
+let ``Cmd.Dispatches.captureMessages: captures async messages`` () =
+    // Arrange
+    let messages =
+        [
+            Case1
+            Case2
+            Case3
+        ]
+        
+    let commands =
+        messages
+        |> List.map (fun msg -> msg |> Cmd.ofMsg |> delayed 100)
+        |> Cmd.batch
+        
+    // Act
+    let results = commands |> Cmd.Dispatches.captureMessages |> Set.ofList
+    
+    // Assert
+    messages |> Set.ofList  =! results

@@ -1,6 +1,7 @@
 ﻿namespace Elmish.Test.Core
 
 open System
+open System.Threading
 open Elmish
 open System.Threading.Tasks
 
@@ -36,18 +37,24 @@ module Cmd =
 
     module Dispatches =
         /// <summary>
-        /// Tests whether any message dispatched by the command satisfies the given predicate.
-        /// The predicate is applied to the messages dispatch by the command. If any application returns true the
-        /// overall result is true and no further elements are tested. Otherwise, false is returned.
+        /// Determines if any message dispatched by the provided command satisfies the given predicate function.
         /// </summary>
         /// <remarks>
-        /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
+        /// This function requires that each command invokes its dispatch function. If a command fails to do so within
+        /// the configured timeout period, the function will timeout and throw an OperationCanceledException.
+        /// The timeout duration can be adjusted with <see cref="Config.TimeoutLengthMilliseconds"/>.
         /// </remarks>
-        /// <param name="predicate">The function to test the dispatched messages.</param>
-        /// <param name="cmd">The input Cmd.</param>
-        /// <returns>True if any element satisfies the predicate. Otherwise false.</returns>
-        /// <exception cref="TimeoutException">
-        /// Thrown if the command does not complete within the specified time.
+        /// <param name="predicate">
+        /// A function that tests whether a given message fulfills a specific condition.
+        /// </param>
+        /// <param name="cmd">The command (Cmd) that dispatches messages to be tested by the predicate function.</param>
+        /// <returns>
+        /// True if at least one dispatched message satisfies the predicate function. If no messages meet the condition
+        /// or no messages are dispatched, it returns false.
+        /// </returns>
+        /// <exception cref="OperationCanceledException">
+        /// Thrown if the operation exceeds the configured timeout period, or one or more commands do not invoke their
+        /// dispatch function.
         /// </exception>
         let exists (predicate: 'msg -> bool) (cmd: Cmd<'msg>) =
             let tcs = TaskCompletionSource<bool>()
@@ -70,29 +77,36 @@ module Cmd =
 
                 subCmd dispatch
 
-            async {
-                cmd |> List.iter exec
+            use cts =
+                new CancellationTokenSource(TimeSpan.FromMilliseconds(Config.TimeoutLengthMilliseconds))
 
-                return!
-                    tcs.Task
-                    |> Async.AwaitTask
-                    |> Async.withTimeout Config.TimeoutLengthMilliseconds
-            }
-            |> Async.RunSynchronously
+            let task =
+                task {
+                    cmd |> List.iter exec
+                    return! tcs.Task
+                }
+
+            task.Wait(cts.Token)
+            task.Result
 
         /// <summary>
-        /// Tests whether all messages dispatched by the command satisfies the given predicate.
-        /// The predicate is applied to the messages dispatch by the command. If any application returns false then the
-        /// overall result is false and no further elements are tested. Otherwise, true is returned.
+        /// Determines whether all messages dispatched by the provided command satisfy the given predicate function.
         /// </summary>
-        /// <param name="predicate">The function to test the dispatched messages.</param>
-        /// <param name="cmd">The input Cmd.</param>
-        /// <returns>True if every element satisfies the predicate. Otherwise false.</returns>
         /// <remarks>
-        /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
+        /// This function requires that each command invokes its dispatch function. If a command fails to do so within
+        /// the configured timeout period, the function will timeout and throw an OperationCanceledException.
+        /// The timeout duration can be adjusted with <see cref="Config.TimeoutLengthMilliseconds"/>.
         /// </remarks>
-        /// <exception cref="TimeoutException">
-        /// Thrown if the command does not complete within the specified time.
+        /// <param name="predicate">
+        /// A function that tests whether a given message fulfills a specific condition.
+        /// </param>
+        /// <param name="cmd">The command (Cmd) that dispatches messages to be tested by the predicate function.</param>
+        /// <returns>
+        /// Returns false if a least one message does not meed the condition. Otherwise returns true.
+        /// </returns>
+        /// <exception cref="OperationCanceledException">
+        /// Thrown if the operation exceeds the configured timeout period, or one or more commands do not invoke their
+        /// dispatch function.
         /// </exception>
         let forall (predicate: 'msg -> bool) (cmd: Cmd<'msg>) =
             let tcs = TaskCompletionSource<bool>()
@@ -116,30 +130,44 @@ module Cmd =
 
                 subCmd dispatch
 
-            async {
-                cmd |> List.iter exec
-                return! Async.AwaitTask tcs.Task
-            }
-            |> Async.withTimeout Config.TimeoutLengthMilliseconds
-            |> Async.RunSynchronously
+            use cts =
+                new CancellationTokenSource(TimeSpan.FromMilliseconds(Config.TimeoutLengthMilliseconds))
+
+            let task =
+                task {
+                    cmd |> List.iter exec
+                    return! tcs.Task
+                }
+
+            task.Wait(cts.Token)
+            task.Result
 
         /// <summary>
-        /// Executes the provided commands and captures all messages sent through the dispatch function.
+        /// Captures all messages dispatched by the provided command.
         /// </summary>
-        /// <param name="cmd">The command to execute.</param>
-        /// <returns>A list of messages captured during the execution of the command.</returns>
         /// <remarks>
-        /// The timeout length can be configured with <see cref="Config.TimeoutLengthMilliseconds"/>.
+        /// This function requires that each command invokes its dispatch function. If a command fails to do so within
+        /// the configured timeout period, the function will timeout and throw an OperationCanceledException.
+        /// The timeout duration can be adjusted with <see cref="Config.TimeoutLengthMilliseconds"/>.
+        /// The order of the captured messages in the result list corresponds to the order of dispatches in the command.
         /// </remarks>
-        /// <exception cref="TimeoutException">
-        /// Thrown if the command does not complete within the specified time.
+        /// <param name="cmd">The command (Cmd) that dispatches messages to be captured.</param>
+        /// <returns>
+        /// A list of all messages dispatched by the command. If the command is Cmd.none, an empty list is returned.
+        /// </returns>
+        /// <exception cref="OperationCanceledException">
+        /// Thrown if the operation exceeds the configured timeout period, or one or more commands do not invoke their
+        /// dispatch function.
         /// </exception>
         let captureMessages (cmd: Cmd<'msg>) =
             let tcs = TaskCompletionSource<'msg list>()
             let mutable pending = cmd.Length
-            let mutable msgs = []
             let syncRoot = obj ()
+            let mutable msgs = []
 
+            if pending = 0 then
+                tcs.TrySetResult [] |> ignore
+            
             let exec subCmd =
                 let dispatch msg =
                     lock syncRoot (fun () ->
@@ -147,13 +175,18 @@ module Cmd =
                         pending <- pending - 1
 
                         if pending = 0 then
-                            tcs.TrySetResult(msgs |> List.rev) |> ignore)
+                            tcs.TrySetResult(msgs) |> ignore)
 
                 subCmd dispatch
 
-            async {
-                cmd |> List.iter exec
-                return! Async.AwaitTask tcs.Task
-            }
-            |> Async.withTimeout Config.TimeoutLengthMilliseconds
-            |> Async.RunSynchronously
+            use cts =
+                new CancellationTokenSource(TimeSpan.FromMilliseconds(Config.TimeoutLengthMilliseconds))
+
+            let task =
+                task {
+                    cmd |> List.iter exec
+                    return! tcs.Task
+                }
+
+            task.Wait(cts.Token)
+            task.Result

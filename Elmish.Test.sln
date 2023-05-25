@@ -4,6 +4,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Core", "Core\Core.fsproj", 
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "Tests\Tests.fsproj", "{258C9D60-A32D-4A52-89EC-29738A57C429}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "NUnitExt", "NUnitExt\NUnitExt.fsproj", "{9BA5943C-297D-4CA0-B304-34BCB7A62D11}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{258C9D60-A32D-4A52-89EC-29738A57C429}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{258C9D60-A32D-4A52-89EC-29738A57C429}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{258C9D60-A32D-4A52-89EC-29738A57C429}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9BA5943C-297D-4CA0-B304-34BCB7A62D11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BA5943C-297D-4CA0-B304-34BCB7A62D11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BA5943C-297D-4CA0-B304-34BCB7A62D11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BA5943C-297D-4CA0-B304-34BCB7A62D11}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -35,3 +35,7 @@ Extends NUnit's `Assert` module with functions corresponding to the `Cmd.Dispatc
 ## Gotchas
 - All functions in the `Core.Cmd.Dispatches` module (e.g., `Cmd.Dispatches.exists`) requires that each command invokes its dispatch function. If a command fails to do so within the configured timeout period, the function will timeout and throw an `OperationCanceledException`. The same holds for any function that depends on these functions (e.g., `Assert.Cmd.exists`).
 - When using `Cmd.execute`, the command gets initiated, but the function doesn't wait for its completion. If you need to wait for a command's completion that dispatches messages, refer to the `Cmd.Dispatches` module. Conversely, if the command does not dispatch messages and there's a need to wait for its completion, use `Cmd.executeWithDelay`.
+
+
+## License
+This project is licensed under the Mozilla Public License 2.0 (MPL 2.0). See [LICENSE](https://github.com/bryanbharper/Elmish.Test/blob/main/LICENSE) for details.

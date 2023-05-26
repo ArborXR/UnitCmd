@@ -1,6 +1,7 @@
 module Elmish.Test.Tests.Cmd
 
 open System
+open System.Threading
 open Elmish
 open Xunit
 open Swensen.Unquote
@@ -470,36 +471,30 @@ let ``Cmd.Delay.forall: returns false WHEN one message does not satisfy predicat
     // Assert
     Assert.False result
     
+[<Fact>]
+let ``Cmd.Delay.captureMessages: captures messages`` () =
+    // Arrange
+    let messages =
+        [
+            Case1
+            Case2
+            Case3
+        ]
+        
+    let ofMsgDelayed (delayMs: int) (msg: Msg) =
+        let sub (dispatch: Msg -> unit) : unit =
+            Thread.Sleep delayMs
+            dispatch msg
+        Cmd.ofSub sub
+
+    let commands =
+        messages
+        |> List.map (ofMsgDelayed 100)
+        |> Cmd.batch
+        
+    // Act
+    let results = commands |> Cmd.Delay.captureMessages (TimeSpan.FromMilliseconds 400)
     
-// [<Fact>]
-// let ``Cmd.Delay.captureMessages: captures messages`` () =
-//     // Arrange
-//     let messages =
-//         [
-//             Case1
-//             Case2
-//             Case3
-//         ]
-//         
-//     let ofMsgDelayed (delayMs: int) (msg: Msg) =
-//         let sub (dispatch: Msg -> unit) : unit =
-//             let delayedDispatch = async {
-//                 do! Async.Sleep delayMs
-//                 dispatch msg
-//             }
-//             
-//             Async.Start delayedDispatch
-//             
-//         Cmd.ofSub sub
-//         
-//     let commands =
-//         messages
-//         |> List.map (ofMsgDelayed 0)
-//         |> Cmd.batch
-//         
-//     // Act
-//     let results = commands |> Cmd.Delay.captureMessages (TimeSpan.FromMilliseconds 500)
-//     
-//     // Assert
-//     messages |> Set.ofList  =! (results |> Set.ofList)
-//     
+    // Assert
+    messages |> Set.ofList  =! (results |> Set.ofList)
+    

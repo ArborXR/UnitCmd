@@ -227,7 +227,7 @@ module Cmd =
         /// </remarks>
         let start (delay: TimeSpan) (cmd: Cmd<'msg>) =
             start cmd
-            delay |> Async.Sleep |> Async.RunSynchronously
+            Thread.Sleep delay
 
         /// <summary>
         /// Determines if any message dispatched by the provided command satisfies the given predicate function.
@@ -255,7 +255,7 @@ module Cmd =
                 subCmd dispatch
                 
             cmd |> List.iter execute
-            delay |> Async.Sleep |> Async.RunSynchronously
+            Thread.Sleep delay
             predicateIsSatisfied
     
         /// <summary>
@@ -284,7 +284,7 @@ module Cmd =
                 subCmd dispatch
                 
             cmd |> List.iter execute
-            delay |> Async.Sleep |> Async.RunSynchronously
+            Thread.Sleep delay
             predicateIsSatisfied
     
         /// <summary>
@@ -308,7 +308,7 @@ module Cmd =
                     msgs <- msg :: msgs
         
             cmd |> List.iter (fun call -> call dispatch)
-            delay |> Async.Sleep |> Async.RunSynchronously
+            Thread.Sleep delay
             msgs
             
     

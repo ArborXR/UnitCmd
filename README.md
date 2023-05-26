@@ -137,7 +137,8 @@ let ``Cmd.Delay.exists: returns true WHEN predicate satisfied by at least one me
 ```
 
 The upshot is that these functions can handle commands which do not make use of their dispatch function. The downside
-is that it requires a good estimate of how long your asynchronous commands will run.
+is that it requires a good estimate of how long your asynchronous commands will run. These functions also make
+use of `Thread.Sleep` and so should be avoided if possible.
 
 # Configuration
 The length of time before a function times out can be configured.

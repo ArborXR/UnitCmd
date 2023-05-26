@@ -150,6 +150,3 @@ Config.TimeoutLengthMilliseconds <- 3000
 ```
 
 The default value is 2000 milliseconds. 
-
-## License
-This project is licensed under the Mozilla Public License 2.0 (MPL 2.0). See [LICENSE](https://github.com/bryanbharper/Elmish.Test/blob/main/LICENSE) for details.

@@ -25,7 +25,7 @@ module Assert =
         /// dispatch function.
         /// </exception>
         let exists (predicate: 'msg -> bool) (cmd: Cmd<'msg>) =
-            Assert.True(cmd |> Cmd.Dispatches.exists predicate, "No dispatched message satisfied the predicate.")
+            Assert.True(cmd |> Cmd.Await.exists predicate, "No dispatched message satisfied the predicate.")
 
         /// <summary>
         /// Asserts that all messages dispatched by the provided command satisfy the given predicate function.
@@ -46,5 +46,5 @@ module Assert =
         /// dispatch function.
         /// </exception>
         let forall (predicate: 'msg -> bool) (cmd: Cmd<'msg>) =
-            Assert.True(cmd |> Cmd.Dispatches.forall predicate, "One or more dispatched messages did not satisfy the predicate.")
+            Assert.True(cmd |> Cmd.Await.forall predicate, "One or more dispatched messages did not satisfy the predicate.")
 

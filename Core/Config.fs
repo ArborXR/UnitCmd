@@ -2,4 +2,4 @@
 
 [<RequireQualifiedAccess>]
 module Config =
-    let mutable TimeoutLengthMilliseconds = 3000
+    let mutable TimeoutLengthMilliseconds = 1000

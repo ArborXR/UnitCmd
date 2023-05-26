@@ -142,7 +142,7 @@ module Cmd =
         /// Thrown if the operation exceeds the configured timeout period, or one or more commands do not invoke their
         /// dispatch function.
         /// </exception>
-        let run (cmd: Cmd<'msg>) =
+        let start (cmd: Cmd<'msg>) =
             cmd |> awaitDispatch () (fun _ _ -> ())
         
         /// <summary>
@@ -302,12 +302,13 @@ module Cmd =
         /// </param>
         let captureMessages (delay: TimeSpan) (cmd: Cmd<'msg>) =
             let mutable msgs = []
-
-            let dispatch: Dispatch<'msg> =
+        
+            let dispatch: 'msg -> unit =
                 fun msg ->
                     msgs <- msg :: msgs
-
+        
             cmd |> List.iter (fun call -> call dispatch)
             delay |> Async.Sleep |> Async.RunSynchronously
-            msgs |> List.rev
+            msgs
+            
     

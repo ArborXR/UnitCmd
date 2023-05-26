@@ -11,15 +11,17 @@ type Msg =
     | Case2
     | Case3
 
-let delayed (delayMs: int) (cmd: Cmd<'msg>) =
-    let delayedCmd (dispatch: 'msg -> unit) =
-        let delayedDispatch =
-            async {
+module Cmd =
+    let ofMsgDelayed (delayMs: int) (msg: Msg) =
+        let sub (dispatch: Msg -> unit) : unit =
+            let delayedDispatch = async {
                 do! Async.Sleep delayMs
-                cmd |> List.iter (fun call -> call dispatch)
+                dispatch msg
             }
-        Async.Start delayedDispatch
-    Cmd.ofSub delayedCmd
+
+            Async.StartImmediate delayedDispatch
+
+        Cmd.ofSub sub
 
 [<Fact>]
 let ``Cmd.start: runs all commands`` () =
@@ -123,6 +125,27 @@ let ``Cmd.forall: returns false WHEN one message does not satisfy predicate`` ()
     Assert.False result
 
 [<Fact>]
+let ``Cmd.captureMessages: captures messages`` () =
+    // Arrange
+    let messages =
+        [
+            Case1
+            Case2
+            Case3
+        ]
+        
+    let commands =
+        messages
+        |> List.map (fun msg -> msg |> Cmd.ofMsg)
+        |> Cmd.batch
+        
+    // Act
+    let results = commands |> Cmd.captureMessages |> Set.ofList
+    
+    // Assert
+    messages |> Set.ofList  =! results
+
+[<Fact>]
 let ``Cmd.Await.exists: returns false with Cmd.none`` () =
     // Arrange
     let cmd = Cmd.none
@@ -150,7 +173,7 @@ let ``Cmd.Await.exists: returns true WHEN synchronous AND predicate satisfied`` 
 let ``Cmd.Await.exists: returns true WHEN async AND predicate satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -176,7 +199,7 @@ let ``Cmd.Await.exists: returns false WHEN synchronous AND predicate is not sati
 let ``Cmd.Await.exists: returns false WHEN async AND predicate is not satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -188,7 +211,7 @@ let ``Cmd.Await.exists: returns false WHEN async AND predicate is not satisfied`
 [<Fact>]
 let ``Cmd.Await.exists: times out if running for over default three seconds`` () =
     // Arrange
-    let cmd = Case1 |> Cmd.ofMsg |> delayed 3020
+    let cmd = Case1 |> Cmd.ofMsgDelayed 3020
     
     // Act/Assert
     Assert.Throws<OperationCanceledException>(fun () ->  cmd |> Cmd.Await.exists ((=) Case1) |> ignore)
@@ -198,7 +221,7 @@ let ``Cmd.Await.exists: can increase timeout`` () =
     // Arrange
     let initialTimeout = Config.TimeoutLengthMilliseconds
     Config.TimeoutLengthMilliseconds <- initialTimeout + 200
-    let cmd = Case1 |> Cmd.ofMsg |> delayed (initialTimeout + 100)
+    let cmd = Case1 |> Cmd.ofMsgDelayed (initialTimeout + 100)
     
     // Act
     let result = cmd |> Cmd.Await.exists ((=) Case1)
@@ -248,7 +271,7 @@ let ``Cmd.Await.forall: returns true WHEN synchronous AND predicate satisfied`` 
 let ``Cmd.Await.forall: returns true WHEN async AND predicate satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -274,7 +297,7 @@ let ``Cmd.Await.forall: returns false WHEN synchronous AND predicate is not sati
 let ``Cmd.Await.forall: returns false WHEN async AND predicate is not satisfied`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -287,7 +310,7 @@ let ``Cmd.Await.forall: returns false WHEN async AND predicate is not satisfied`
 let ``Cmd.Await.forall: times out if running for over default configured timeout`` () =
     // Arrange
     let delay = Config.TimeoutLengthMilliseconds + 100
-    let cmd = Case1 |> Cmd.ofMsg |> delayed delay
+    let cmd = Case1 |> Cmd.ofMsgDelayed delay
     
     // Act/Assert
     Assert.Throws<OperationCanceledException>(fun () ->  cmd |> Cmd.Await.forall ((=) Case1) |> ignore)
@@ -325,7 +348,7 @@ let ``Cmd.Await.captureMessages: captures async messages`` () =
         
     let commands =
         messages
-        |> List.map (fun msg -> msg |> Cmd.ofMsg |> delayed 100)
+        |> List.map (fun msg -> msg |> Cmd.ofMsgDelayed 100)
         |> Cmd.batch
         
     // Act
@@ -341,15 +364,24 @@ let ``Cmd.Delay.start: runs all commands`` () =
     let mutable cmd2Completed = false
     
     let cmd1 =
-        fun _ -> cmd1Completed <- true
+        fun _ ->
+            async {
+                do! Async.Sleep 100
+                cmd1Completed <- true
+            }
+            |> Async.StartImmediate
         |> Cmd.ofSub
-        |> delayed 100
+
     
     let cmd2 =
-        fun _ -> cmd2Completed <- true
+        fun _ ->
+            async {
+                do! Async.Sleep 100
+                cmd2Completed <- true
+            }
+            |> Async.StartImmediate
         |> Cmd.ofSub
-        |> delayed 100
-    
+        
     let cmds =
         [
             cmd1
@@ -358,10 +390,11 @@ let ``Cmd.Delay.start: runs all commands`` () =
         |> Cmd.batch
     
     // Act
-    cmds |> Cmd.Delay.start (TimeSpan.FromMilliseconds 150)
+    cmds |> Cmd.Delay.start (TimeSpan.FromMilliseconds 300)
     
     // Assert
     Assert.True cmd1Completed
+    Assert.True cmd2Completed
  
 [<Fact>]
 let ``Cmd.Delay.exists: returns false with Cmd.none`` () =
@@ -378,7 +411,7 @@ let ``Cmd.Delay.exists: returns false with Cmd.none`` () =
 let ``Cmd.Delay.exists: returns true WHEN predicate satisfied by at least one message`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -391,7 +424,7 @@ let ``Cmd.Delay.exists: returns true WHEN predicate satisfied by at least one me
 let ``Cmd.Delay.exists: returns false WHEN predicate is not satisfied by any message`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -415,7 +448,7 @@ let ``Cmd.Delay.forall: returns false with Cmd.none`` () =
 let ``Cmd.Delay.forall: returns true WHEN all messages satisfy predicate`` () =
     // Arrange
     let cmd =
-        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -428,7 +461,7 @@ let ``Cmd.Delay.forall: returns true WHEN all messages satisfy predicate`` () =
 let ``Cmd.Delay.forall: returns false WHEN one message does not satisfy predicate`` () =
     // Arrange
     let cmd =
-        [ Cmd.ofMsg Case1 |> delayed 100; Cmd.ofMsg Case1 |> delayed 100;  Cmd.ofMsg Case2 |> delayed 100 ]
+        [ Case1 |> Cmd.ofMsgDelayed 100; Case1 |> Cmd.ofMsgDelayed 100;  Case2 |> Cmd.ofMsgDelayed 100 ]
         |> Cmd.batch
 
     // Act
@@ -437,3 +470,36 @@ let ``Cmd.Delay.forall: returns false WHEN one message does not satisfy predicat
     // Assert
     Assert.False result
     
+    
+// [<Fact>]
+// let ``Cmd.Delay.captureMessages: captures messages`` () =
+//     // Arrange
+//     let messages =
+//         [
+//             Case1
+//             Case2
+//             Case3
+//         ]
+//         
+//     let ofMsgDelayed (delayMs: int) (msg: Msg) =
+//         let sub (dispatch: Msg -> unit) : unit =
+//             let delayedDispatch = async {
+//                 do! Async.Sleep delayMs
+//                 dispatch msg
+//             }
+//             
+//             Async.Start delayedDispatch
+//             
+//         Cmd.ofSub sub
+//         
+//     let commands =
+//         messages
+//         |> List.map (ofMsgDelayed 0)
+//         |> Cmd.batch
+//         
+//     // Act
+//     let results = commands |> Cmd.Delay.captureMessages (TimeSpan.FromMilliseconds 500)
+//     
+//     // Assert
+//     messages |> Set.ofList  =! (results |> Set.ofList)
+//     

@@ -1,51 +1,154 @@
 # Elmish.Test
 Elmish.Test is a library created to facilitate unit testing with Elmish commands in F#. The library allows you to run commands, capture dispatched messages, or make assertions against the dispatched messages. 
 
-## Getting Started
+# Getting Started
 
-To use Elmish.Test, you need to add a reference to it in your F# project. You can add this through NuGet or reference it directly if you have cloned the source code.
+To Do: Nuget command, link, etc.
 
-Once Elmish.Test is referenced in your project, you can import it in your test files:
+## Basic (Synchronous) Use
+
+The `Cmd.start` function can be used to run commands, which can be used to verify that a specific _(synchronous)_
+command has been returned by your Elmish `update` function.
 
 ```fsharp
 open Elmish.Test.Core
-open Elmish.Test.NUnitExt
+
+[<Fact>]
+let ``Cmd.start: runs all commands`` () =
+    // Arrange
+    let mutable completed = false
+    
+    let cmd =
+        fun _ -> completed <- true
+        |> Cmd.ofSub
+    
+    // Act
+    cmd |> Cmd.start
+    
+    // Assert
+    Assert.True completed
 ```
 
-## Elmish.Test.Core
-Contains core functions to run commands, capture messages, etc.. Is used by other projects, such as `NUnitExt`.
+The `Cmd.captureMessages` function can be used to capture all messages dispatched by a (synchronous) command. 
 
-`Cmd.execute (cmd: Cmd<'msg>): unit` - Executes the provided command with a no-op dispatch function. This is useful when there's a need to initiate a command but not wait for its completion.
+```fsharp
+[<Fact>]
+let ``Cmd.captureMessages: captures messages`` () =
+    // Arrange
+    let messages =
+        [
+            Case1
+            Case2
+            Case3
+        ]
+        
+    let commands =
+        messages
+        |> List.map (fun msg -> msg |> Cmd.ofMsg)
+        |> Cmd.batch
+        
+    // Act
+    let results = commands |> Cmd.captureMessages 
+    
+    // Assert
+    (messages |> Set.ofList) = (results |> Set.ofList) 
+    |> Assert.True
+```
 
-`Cmd.executeWithDelay (delay: TimeSpan) (cmd: Cmd<'msg>): unit` - Executes the provided command after a specified delay. It can be used when there's a need to wait for the completion of an asynchronous command. Note that this is different from Cmd.execute in that it waits for a specified delay after initiating the command.
+The `Cmd.exists` and `Cmd.forall` functions operate just like the `Seq.exists` and `Seq.forall` functions, 
+but with `Cmd<'msg>`s rather than `Seq<'a>`s.
+```fsharp
+[<Fact>]
+let ``Cmd.exists: returns true WHEN predicate satisfied by at least one message`` () =
+    // Arrange
+    let cmd =
+        [ Cmd.ofMsg Case1; Cmd.ofMsg Case2; Cmd.ofMsg Case3 ]
+        |> Cmd.batch
 
-`Cmd.Dispatches.exists (predicate: 'msg -> bool) (cmd: Cmd<'msg>): bool` - Determines if any message dispatched by the provided command satisfies the given predicate function.
+    // Act
+    let result = cmd |> Cmd.exists ((=) Case2)
+    
+    // Assert
+    Assert.True result
+```
 
-`Cmd.Dispatches.forall (predicate: 'msg -> bool) (cmd: Cmd<'msg>): bool` - Determines whether all messages dispatched by the provided command satisfy the given predicate function.
+> **IMPORTANT:** These functions initiate the provided commands but do not wait for the completion of any asynchronous 
+> sub-commands. If you need to wait for the completion of an asynchronous command, see the `Await` and `Delay` 
+> sections below.
 
-`Cmd.Dispatches.captureMessages (cmd: Cmd<'msg>): 'msg list` - Captures all messages dispatched by the provided command. The order of the captured messages in the result list corresponds to the order of dispatches in the command.
+## The `Cmd.Await` Module
+The functions listed above do not wait for the completion of asynchronous commands. Thus, if you have an asynchronous 
+command, the test may finish before the command does, causing a false positive/negative. 
 
-## Elmish.Test.NUnitExt
-Extends NUnit's `Assert` module with functions corresponding to the `Cmd.Dispatches.exists` and `Cmd.Dispatches.forall` functions. 
+The `Cmd.Await` module has the same functions as before (`start`, `captureMessages`, `exists`, and `forall`), with the 
+key difference that these functions will wait for the `dispatch` function to get invoked by _every sub-command_ provided.
+This enables you test test asynchronous commands that dispatch messages.
 
-`Assert.Cmd.exists (predicate: 'msg -> bool) (cmd: Cmd<'msg>): unit` - Asserts that at least one message dispatched by the provided command satisfies the given predicate function. It uses `Cmd.Dispatches.exists` to check if any message satisfies the predicate. If not, it throws an `AssertionException`.
+```fsharp
+[<Fact>]
+let ``Cmd.Await.exists: returns true WHEN async AND predicate satisfied`` () =
+    // Arrange
+    let cmd =
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        |> Cmd.batch
 
-`Assert.Cmd.forall (predicate: 'msg -> bool) (cmd: Cmd<'msg>)` - Asserts that all messages dispatched by the provided command satisfy the given predicate function. It uses `Cmd.Dispatches.forall` to check if all messages satisfy the predicate. If not, it throws an `AssertionException`.
+    // Act
+    let result = cmd |> Cmd.Await.exists ((=) Case2)
+    
+    // Assert
+    Assert.True result
+```
 
-## Gotchas
-- All functions in the `Core.Cmd.Dispatches` module (e.g., `Cmd.Dispatches.exists`) requires that each command invokes its dispatch function. If a command fails to do so within the configured timeout period, the function will timeout and throw an `OperationCanceledException`. The same holds for any function that depends on these functions (e.g., `Assert.Cmd.exists`).
-- When using `Cmd.execute`, the command gets initiated, but the function doesn't wait for its completion. If you need to wait for a command's completion that dispatches messages, refer to the `Cmd.Dispatches` module. Conversely, if the command does not dispatch messages and there's a need to wait for its completion, use `Cmd.executeWithDelay`.
+There is an _important gotcha_, however. If _any_ sub command does not invoke its `dispatch` function, the
+test will timeout:
 
-## Configuration
+```fsharp
+[<Fact>]
+let ``Cmd.Await.exists: times out if command never dispatches`` () =
+    // Arrange
+    let command =
+        fun _ -> ()
+        |> Cmd.ofSub
+    
+    // Act
+    // Assert
+    Assert.Throws<OperationCanceledException>(fun () -> command |> Cmd.Await.exists (fun _ -> true) |> ignore)
+```
+
+## The `Cmd.Delay` Module
+
+The `Cmd.Delay` module is a middle ground between the above modules. It has the same functions before, except each has
+an additional `(delay: TimeSpan)` parameter. Instead of waiting for the `dispatch` function to get invoked, these
+functions start the command and then wait for the specified amount of time before completing.
+
+```fsharp
+[<Fact>]
+let ``Cmd.Delay.exists: returns true WHEN predicate satisfied by at least one message`` () =
+    // Arrange
+    let cmd =
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        |> Cmd.batch
+
+    // Act
+    let result = cmd |> Cmd.Delay.exists (TimeSpan.FromMilliseconds 150) ((=) Case2)
+    
+    // Assert
+    Assert.True result
+```
+
+The upshot is that these functions can handle commands which do not make use of their dispatch function. The downside
+is that it requires a good estimate of how long your asynchronous commands will run.
+
+# Configuration
 The length of time before a function times out can be configured.
 
 ```fsharp
 open Elmish.Tests.Core
 
-Config.TimeoutLengthMilliseconds <- 2000
+Config.TimeoutLengthMilliseconds <- 3000
 ```
 
-The default value is three seconds. 
+The default value is 2000 milliseconds. 
 
 ## License
 This project is licensed under the Mozilla Public License 2.0 (MPL 2.0). See [LICENSE](https://github.com/bryanbharper/Elmish.Test/blob/main/LICENSE) for details.

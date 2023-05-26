@@ -15,7 +15,7 @@ module Cmd =
     /// If you need to wait for a command's completion that dispatches messages,
     /// refer to the <see cref="Cmd.Await"/> module.
     /// Conversely, if the command does not dispatch messages and there's a need to wait for its completion,
-    /// use the <see cref="Cmd.Delayed.start"/> function.
+    /// use the <see cref="Cmd.Delay.start"/> function.
     /// </remarks>
     let start (cmd: Cmd<'msg>) =
         let dispatch: Dispatch<'msg> = fun _ -> ()
@@ -213,7 +213,7 @@ module Cmd =
             let addMsg msg res = msg :: res
             cmd |> awaitDispatch [] addMsg
 
-    module Delayed =
+    module Delay =
         /// <summary>
         /// Starts the provided command then waits for specified delay.
         /// </summary>

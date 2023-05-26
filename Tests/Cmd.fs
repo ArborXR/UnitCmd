@@ -22,7 +22,7 @@ let delayed (delayMs: int) (cmd: Cmd<'msg>) =
     Cmd.ofSub delayedCmd
 
 [<Fact>]
-let ``start: runs all commands`` () =
+let ``Cmd.start: runs all commands`` () =
     // Arrange
     let mutable cmd1Completed = false
     let mutable cmd2Completed = false
@@ -333,3 +333,107 @@ let ``Cmd.Await.captureMessages: captures async messages`` () =
     
     // Assert
     messages |> Set.ofList  =! results
+    
+[<Fact>]
+let ``Cmd.Delay.start: runs all commands`` () =
+    // Arrange
+    let mutable cmd1Completed = false
+    let mutable cmd2Completed = false
+    
+    let cmd1 =
+        fun _ -> cmd1Completed <- true
+        |> Cmd.ofSub
+        |> delayed 100
+    
+    let cmd2 =
+        fun _ -> cmd2Completed <- true
+        |> Cmd.ofSub
+        |> delayed 100
+    
+    let cmds =
+        [
+            cmd1
+            cmd2
+        ]
+        |> Cmd.batch
+    
+    // Act
+    cmds |> Cmd.Delay.start (TimeSpan.FromMilliseconds 150)
+    
+    // Assert
+    Assert.True cmd1Completed
+ 
+[<Fact>]
+let ``Cmd.Delay.exists: returns false with Cmd.none`` () =
+    // Arrange
+    let cmd = Cmd.none
+    
+    // Act
+    let result = cmd |> Cmd.Delay.exists (TimeSpan.FromMilliseconds 150) (fun _ -> true)
+    
+    // Assert
+    Assert.False result
+
+[<Fact>]
+let ``Cmd.Delay.exists: returns true WHEN predicate satisfied by at least one message`` () =
+    // Arrange
+    let cmd =
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        |> Cmd.batch
+
+    // Act
+    let result = cmd |> Cmd.Delay.exists (TimeSpan.FromMilliseconds 150) ((=) Case2)
+    
+    // Assert
+    Assert.True result
+
+[<Fact>]
+let ``Cmd.Delay.exists: returns false WHEN predicate is not satisfied by any message`` () =
+    // Arrange
+    let cmd =
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        |> Cmd.batch
+
+    // Act
+    let result = cmd |> Cmd.Delay.exists (TimeSpan.FromMilliseconds 150) ((=) Case3)
+    
+    // Assert
+    Assert.False result
+
+[<Fact>]
+let ``Cmd.Delay.forall: returns false with Cmd.none`` () =
+    // Arrange
+    let cmd = Cmd.none
+    
+    // Act
+    let result = cmd |> Cmd.Delay.forall (TimeSpan.FromMilliseconds 150) (fun _ -> false)
+    
+    // Assert
+    Assert.True result
+
+[<Fact>]
+let ``Cmd.Delay.forall: returns true WHEN all messages satisfy predicate`` () =
+    // Arrange
+    let cmd =
+        [ Case1 |> Cmd.ofMsg |> delayed 100; Case2 |> Cmd.ofMsg |> delayed 100 ]
+        |> Cmd.batch
+
+    // Act
+    let result = cmd |> Cmd.Delay.forall (TimeSpan.FromMilliseconds 150) ((<>) Case3)
+    
+    // Assert
+    Assert.True result
+
+[<Fact>]
+let ``Cmd.Delay.forall: returns false WHEN one message does not satisfy predicate`` () =
+    // Arrange
+    let cmd =
+        [ Cmd.ofMsg Case1 |> delayed 100; Cmd.ofMsg Case1 |> delayed 100;  Cmd.ofMsg Case2 |> delayed 100 ]
+        |> Cmd.batch
+
+    // Act
+    let result = cmd |> Cmd.Delay.forall (TimeSpan.FromMilliseconds 150) ((=) Case1)
+    
+    // Assert
+    Assert.False result
+    

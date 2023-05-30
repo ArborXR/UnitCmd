@@ -5,6 +5,7 @@ open System.Threading
 open Elmish
 open System.Threading.Tasks
 
+[<RequireQualifiedAccess>]
 module Cmd =
     /// <summary>
     /// Starts the provided commands with a no-op dispatch function.
@@ -97,6 +98,7 @@ module Cmd =
         cmd |> List.iter (fun call -> call dispatch)
         msgs |> List.rev
   
+    [<RequireQualifiedAccess>]
     module Await =
         let private awaitDispatch (defaultValue: 'res) (onMsg: 'msg -> 'res -> 'res) (cmd: Cmd<'msg>) =
             let tcs = TaskCompletionSource<'res>()
@@ -213,6 +215,7 @@ module Cmd =
             let addMsg msg res = msg :: res
             cmd |> awaitDispatch [] addMsg
 
+    [<RequireQualifiedAccess>]
     module Delay =
         /// <summary>
         /// Starts the provided command then waits for specified delay.

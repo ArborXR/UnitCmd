@@ -144,7 +144,7 @@ use of `Thread.Sleep` and so should be avoided if possible.
 The length of time before a function times out can be configured.
 
 ```fsharp
-open UnitCmds.Core
+open UnitCmd.Core
 
 Config.TimeoutLengthMilliseconds <- 3000
 ```

@@ -1,11 +1,11 @@
-module Elmish.Test.Tests.Cmd
+module UnitCmd.Tests.Cmd
 
 open System
 open System.Threading
 open Elmish
 open Xunit
 open Swensen.Unquote
-open Elmish.Test.Core
+open UnitCmd.Core
 
 type Msg =
     | Case1

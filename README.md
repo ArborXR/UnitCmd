@@ -1,5 +1,5 @@
-# Elmish.Test
-Elmish.Test is a library created to facilitate unit testing with Elmish commands in F#. The library allows you to run commands, capture dispatched messages, or make assertions against the dispatched messages. 
+# UnitCmd
+UnitCmd is a library created to facilitate unit testing with Elmish commands in F#. The library allows you to run commands, capture dispatched messages, or make assertions against the dispatched messages. 
 
 # Getting Started
 
@@ -11,7 +11,7 @@ The `Cmd.start` function can be used to run commands, which can be used to verif
 command has been returned by your Elmish `update` function.
 
 ```fsharp
-open Elmish.Test.Core
+open UnitCmd.Core
 
 [<Fact>]
 let ``Cmd.start: runs all commands`` () =
@@ -144,7 +144,7 @@ use of `Thread.Sleep` and so should be avoided if possible.
 The length of time before a function times out can be configured.
 
 ```fsharp
-open Elmish.Tests.Core
+open UnitCmds.Core
 
 Config.TimeoutLengthMilliseconds <- 3000
 ```

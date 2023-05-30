@@ -1,8 +1,8 @@
-﻿namespace Elmish.Test.NUnitExt
+﻿namespace CmdUnit.NUnitExt
 
 open Elmish
 open NUnit.Framework
-open Elmish.Test.Core
+open UnitCmd.Core
 
 module Assert =
     module Cmd =

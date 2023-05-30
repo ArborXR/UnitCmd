@@ -1,4 +1,4 @@
-﻿namespace Elmish.Test.Core
+﻿namespace UnitCmd.Core
 
 [<RequireQualifiedAccess>]
 module Config =

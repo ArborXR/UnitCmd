@@ -1,4 +1,4 @@
-﻿namespace Elmish.Test.Core
+﻿namespace UnitCmd.Core
 
 open System
 open System.Threading
